@@ -14,6 +14,10 @@
         "service_worker":  "background.js",
          "type": "module" 
     },
+    "content_scripts": [{
+        "matches": ["*://*/*"],
+        "js": ["changeLinkColor.js"]
+    }],
     "commands": {
         "mark_page": {
             "suggested_key": {
@@ -33,7 +37,9 @@
         "storage",
         "downloads",
         "unlimitedStorage",
-        "scripting"
+        "scripting",
+        "http://*/", 
+        "https://*/"
     ],
     "host_permissions": [
         "http://*/", 

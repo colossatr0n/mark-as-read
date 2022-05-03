@@ -2,6 +2,8 @@ import { tcDefaults } from "./defaults.js"
 
 chrome.runtime.onInstalled.addListener(function() {
     fetchMarkData();
+    // TODO check this
+    fetchFilterData();
 })
 
 function updateDictionary(visited) {
@@ -12,8 +14,18 @@ function updateDictionary(visited) {
     });
 }
 
+function updateFiltersDictionary(filtersByOrigin) {
+    chrome.storage.local.set({ "filters": filtersByOrigin }, function() {
+        if (chrome.runtime.error) {
+            console.log("Runtime error.");
+        }
+    });
+}
+
 chrome.runtime.onStartup.addListener(function() {
     fetchMarkData();
+    // TODO check this
+    fetchFilterData();
 });
 
 chrome.action.onClicked.addListener(async function() {
@@ -104,7 +116,19 @@ function markAsVisited(atabId) {
     return chrome.action.setIcon({ path: "visited.png", tabId: atabId });
 }
 
-chrome.runtime.onMessage.addListener(async function(msg, sender, sendResponse) {
+// TODO check this
+function fetchFilterData() {
+    chrome.storage.local.get("filters", function(obj) {
+        if (obj["filters"] == undefined) {
+            filtersByOrigin = {};
+        } else {
+            var objFilters = obj["filters"];
+            filtersByOrigin = objFilters
+        }
+    });
+}
+
+chrome.runtime.onMessage.addListener(async function(msg) {
     if (msg.action === 'import') {
         var data = msg.data;
 
@@ -131,11 +155,10 @@ chrome.runtime.onMessage.addListener(async function(msg, sender, sendResponse) {
 
 async function removeUrl(url) {
     // console.log("Remove URL")
-    var key = getKey(url);
+    var key = getOrigin(url);
     // console.log(`Key ${key}`)
-    var path = url.replace(key, '');
+    var path = getFilteredPath(url)
     const obj = await fetchMarkData()
-    // console.log(`Path ${path}`)
     const visited = obj["visited"]
     const index = visited[key].indexOf(path);
     // console.log(`Index ${index}`)
@@ -154,31 +177,70 @@ async function markedAsRead(url) {
         const obj = await fetchMarkData()
         const visited = obj["visited"]
         if (visited?.[key]) {
-            var path = url.replace(key, '');
+            var path = getFilteredPath(url)
             return visited[key].includes(path);
         }
     }
     return false
 }
 
+function removeFilter(url) {
+    // console.log("Remove URL")
+    var origin = getOrigin(url);
+    // console.log(`Key ${key}`)
+    var filteredPath = getFilteredPath(url)
+    // console.log(`Path ${path}`)
+    // TODO update this block
+    const index = filtersByOrigin[origin].indexOf(filteredPath);
+    // console.log(`Index ${index}`)
+    if (index > -1) {
+        filtersByOrigin[origin].splice(index, 1);
+    }
+    if (!filtersByOrigin[origin].length) {
+        delete filtersByOrigin[origin];
+    }
+}
+
 async function addUrl(url) {
     // console.log("Add URL")
-    var key = getKey(url);
+    const key = getOrigin(url);
     // console.log(`Key ${key}`)
-    var path = url.replace(key, '');
+    const path = getFilteredPath(url)
+
     // console.log(`Path ${path}`)
     const obj = await fetchMarkData()
     const visited = obj["visited"]
     if (visited[key]) {
         visited[key].push(path);
     } else {
-        visited[key] = [path];
+        visited[origin] = [path];
     }
     await updateDictionary(visited)
 }
 
-function getKey(url) {
+function addFilterFromInput(url, filter) {
+    // console.log("Add URL")
+    var origin = getOrigin(url);
+
+    // TODO update this block
+    if (filtersByOrigin[origin]) {
+        filtersByOrigin[origin].push(filter);
+    } else {
+        filtersByOrigin[origin] = [filter];
+    }
+}
+
+function getOrigin(url) {
     return new URL(url).origin;
+}
+
+function getFilteredPath(url) {
+    const path = url.replace(origin, '');
+    // TODO update this block
+    if (filtersByOrigin) {
+        return path.replace(filtersByOrigin[origin] ?? "", "")
+    }
+    return path.replace(path, "")
 }
 
 async function changeLinkColor(tab) {
@@ -209,7 +271,7 @@ async function changeLinkColor(tab) {
 
 function isVisited(url, visited) {
 	if(url) {
-		var key = getKey(url);
+		var key = getOrigin(url);
 		if(visited?.[key]) {
 			var path = url.replace(key, '');
 			return visited[key].includes(path);

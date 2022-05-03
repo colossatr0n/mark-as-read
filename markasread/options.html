@@ -43,5 +43,26 @@
 			<p>WARNING! This will delete all stored data regarding sites you've visited!</p>
 			<button id="clear">Clear All Stored Data</button>
 		</section>
+		<section>
+			<h3>Regex Filters</h3>
+            <div>
+                <label>URL
+                    <input id="url-origin">
+                </label>
+            </div>
+            <div>
+                <label>Regex Filters
+                    <input id="filters">
+                </label>
+            </div>
+            <div>
+                <button id="add-filter">Add New Filter</button>
+            </div>
+            <table>
+                <thead id="thead"></thead>
+                <tbody id="tbody"></tbody>
+            </table>
+            <button id="clear-filters">Clear Filters</button>
+		</section>
 	</body>
 </html>
