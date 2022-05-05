@@ -74,27 +74,27 @@ function restoreOptions() {
 	});
 }
 
-function initializeFilters() {
-    chrome.storage.local.get("filters", function(obj) {
-        const filtersByOrigin = obj["filters"]
-        if (filtersByOrigin) {
-            renderFilters(filtersByOrigin)
-        } else {
-            updateFilters({})
-        }
-    });
+async function initializeFilters() {
+    const obj = await chrome.storage.local.get("filters")
+    const filters = obj["filters"]
+    if (filters) {
+        renderFilters(filters)
+    } else {
+        await saveFilters({})
+    }
 }
 
-function updateFilters(filtersByOrigin) {
-    chrome.storage.local.set({"filters": filtersByOrigin}, undefined)
+// Duplicate function. Move into util or somthing.
+function saveFilters(filters) {
+    return chrome.storage.local.set({"filters": filters})
 }
 
-function renderFilters(filtersByOrigin) {
+function renderFilters(filters) {
     const header = document.getElementById("thead")
     var tbody = document.getElementById('tbody');
     tbody.innerHTML = ""
-    Object.keys(filtersByOrigin).forEach(origin => {
-        const filtersTextBlock = filtersByOrigin[origin].join("\n")
+    Object.keys(filters).forEach(origin => {
+        const filtersTextBlock = filters[origin].join("\n")
         let tr = "<tr>";
         tr += "<td>" + origin + "</td>" + `<td><textarea rows="4" columns="50">` + filtersTextBlock + "</textarea></td>" 
               + "<td><input></td>"
@@ -108,7 +108,7 @@ function renderFilters(filtersByOrigin) {
     }
 
     tbody.querySelectorAll("textarea").forEach(
-        textarea => textarea.addEventListener("focusout", (event) => {
+        textarea => textarea.addEventListener("focusout", event => {
             const row = textarea.parentElement.parentElement
             const rowData = row.querySelectorAll("td")
             const origin = rowData[0].innerText
@@ -124,7 +124,6 @@ function renderFilters(filtersByOrigin) {
         const rowData = tr.querySelectorAll("td")
             const filters = rowData[1].querySelector("textarea").value.split("\n")
             rowData[2].addEventListener("change", (event) => {
-                let initialText = event.target.value
                 let resultText = event.target.value
                 filters.forEach(filter => {
                     resultText = resultText.replace(new RegExp(filter), "")
@@ -155,32 +154,30 @@ function addFilterFromInput() {
     addFilter(url, filter)
 }
 
-function addFilter(url, filter) {
-    chrome.storage.local.get("filters", function(obj) {
-        const filtersByOrigin = obj["filters"]
-        var origin = getOrigin(url);
+async function addFilter(url, filter) {
+    const obj = await chrome.storage.local.get("filters")
+    const filtersByOrigin = obj["filters"]
+    var origin = getOrigin(url);
 
-        if (filtersByOrigin[origin]) {
-            if (filtersByOrigin[origin].indexOf(filter) === -1) {
-                filtersByOrigin[origin].push(filter)
-            }
-        } else {
-            filtersByOrigin[origin] = [filter];
+    if (filtersByOrigin[origin]) {
+        if (filtersByOrigin[origin].indexOf(filter) === -1) {
+            filtersByOrigin[origin].push(filter)
         }
-        updateFilters(filtersByOrigin)
-        renderFilters(filtersByOrigin)
-    });
+    } else {
+        filtersByOrigin[origin] = [filter];
+    }
+    saveFilters(filtersByOrigin)
+    renderFilters(filtersByOrigin)
 }
 
 function clearFilters() {
-    updateFilters({})
+    return saveFilters({})
 }
 
-function clearFilterKey(originKey) {
-    chrome.storage.local.get("filters", function(obj) {
-        const filtersByOrigin = obj["filters"]
-        filtersByOrigin[originKey] = [] 
-    });
+async function clearFilterKey(originKey) {
+    const obj = await chrome.storage.local.get("filters")
+    const filtersByOrigin = obj["filters"]
+    filtersByOrigin[originKey] = [] 
 }
 
 // TODO move this into a lib
@@ -196,10 +193,10 @@ document.addEventListener('DOMContentLoaded', async function() {
     document.getElementById("save").addEventListener("click", saveOptions);
 	document.getElementById("restore").addEventListener("click", restoreDefaults);
     document.getElementById("add-filter").addEventListener('click', addFilterFromInput);
-    document.getElementById("clear-filters").addEventListener('click', () => {
-        clearFilters(); 
+    document.getElementById("clear-filters").addEventListener('click', async () => {
+        await clearFilters(); 
         initializeFilters()
     });
 	restoreOptions();
-    initializeFilters();
+    await initializeFilters();
 }, false);

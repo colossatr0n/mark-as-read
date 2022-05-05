@@ -3,7 +3,7 @@ import { tcDefaults } from "./defaults.js"
 chrome.runtime.onInstalled.addListener(function() {
     fetchMarkData();
     // TODO check this
-    fetchFilterData();
+    fetchAndNormalizeFilterData();
 })
 
 function updateDictionary(visited) {
@@ -14,18 +14,13 @@ function updateDictionary(visited) {
     });
 }
 
-function updateFiltersDictionary(filtersByOrigin) {
-    chrome.storage.local.set({ "filters": filtersByOrigin }, function() {
-        if (chrome.runtime.error) {
-            console.log("Runtime error.");
-        }
-    });
+function saveFilters(filters) {
+    return chrome.storage.local.set({ "filters": filters })
 }
 
 chrome.runtime.onStartup.addListener(function() {
     fetchMarkData();
-    // TODO check this
-    fetchFilterData();
+    fetchAndNormalizeFilterData();
 });
 
 chrome.action.onClicked.addListener(async function() {
@@ -106,6 +101,14 @@ async function fetchMarkData() {
     return chrome.storage.local.get("visited")
 }
 
+async function fetchAndNormalizeFilterData() {
+    const obj = await chrome.storage.local.get("filters")
+    if (obj["filters"] == undefined) {
+        await saveFilters({});
+    } 
+    return chrome.storage.local.get("filters")
+}
+
 function markAsNotVisited(atabId) {
     // console.log("markAsNotVisited");
     return chrome.action.setIcon({ path: "notvisited.png", tabId: atabId });
@@ -116,19 +119,7 @@ function markAsVisited(atabId) {
     return chrome.action.setIcon({ path: "visited.png", tabId: atabId });
 }
 
-// TODO check this
-function fetchFilterData() {
-    chrome.storage.local.get("filters", function(obj) {
-        if (obj["filters"] == undefined) {
-            filtersByOrigin = {};
-        } else {
-            var objFilters = obj["filters"];
-            filtersByOrigin = objFilters
-        }
-    });
-}
-
-chrome.runtime.onMessage.addListener(async function(msg) {
+chrome.runtime.onMessage.addListener(async function(msg, sender, sendResponse) {
     if (msg.action === 'import') {
         var data = msg.data;
 
@@ -157,8 +148,8 @@ async function removeUrl(url) {
     // console.log("Remove URL")
     var key = getOrigin(url);
     // console.log(`Key ${key}`)
-    var path = getFilteredPath(url)
     const obj = await fetchMarkData()
+    var path = await getFilteredPath(url)
     const visited = obj["visited"]
     const index = visited[key].indexOf(path);
     // console.log(`Index ${index}`)
@@ -177,35 +168,18 @@ async function markedAsRead(url) {
         const obj = await fetchMarkData()
         const visited = obj["visited"]
         if (visited?.[key]) {
-            var path = getFilteredPath(url)
+            var path = await getFilteredPath(url)
             return visited[key].includes(path);
         }
     }
     return false
 }
 
-function removeFilter(url) {
-    // console.log("Remove URL")
-    var origin = getOrigin(url);
-    // console.log(`Key ${key}`)
-    var filteredPath = getFilteredPath(url)
-    // console.log(`Path ${path}`)
-    // TODO update this block
-    const index = filtersByOrigin[origin].indexOf(filteredPath);
-    // console.log(`Index ${index}`)
-    if (index > -1) {
-        filtersByOrigin[origin].splice(index, 1);
-    }
-    if (!filtersByOrigin[origin].length) {
-        delete filtersByOrigin[origin];
-    }
-}
-
 async function addUrl(url) {
     // console.log("Add URL")
     const key = getOrigin(url);
     // console.log(`Key ${key}`)
-    const path = getFilteredPath(url)
+    const path = await getFilteredPath(url)
 
     // console.log(`Path ${path}`)
     const obj = await fetchMarkData()
@@ -213,34 +187,28 @@ async function addUrl(url) {
     if (visited[key]) {
         visited[key].push(path);
     } else {
-        visited[origin] = [path];
+        visited[key] = [path];
     }
     await updateDictionary(visited)
-}
-
-function addFilterFromInput(url, filter) {
-    // console.log("Add URL")
-    var origin = getOrigin(url);
-
-    // TODO update this block
-    if (filtersByOrigin[origin]) {
-        filtersByOrigin[origin].push(filter);
-    } else {
-        filtersByOrigin[origin] = [filter];
-    }
 }
 
 function getOrigin(url) {
     return new URL(url).origin;
 }
 
-function getFilteredPath(url) {
-    const path = url.replace(origin, '');
-    // TODO update this block
-    if (filtersByOrigin) {
-        return path.replace(filtersByOrigin[origin] ?? "", "")
+async function getFilteredPath(url) {
+    const origin = getOrigin(url)
+    let path = url.replace(origin, '');
+
+    const obj = await fetchAndNormalizeFilterData()
+    const filtersByOrigin = obj["filters"]
+    const filters = filtersByOrigin[origin]
+    if (filters) {
+        filters.forEach(filter => {
+            path = path.replace(new RegExp(filter), "")
+        })
     }
-    return path.replace(path, "")
+    return path
 }
 
 async function changeLinkColor(tab) {
