@@ -1,12 +1,12 @@
 import { tcDefaults } from "./defaults.js"
 
-function download() {
-    chrome.storage.local.get("visited", function(obj) {
-        var result = JSON.stringify(obj["visited"], null, 4); 
+function download(key) {
+    chrome.storage.local.get(key, function(obj) {
+        var result = JSON.stringify(obj[key], null, 4);
         var url = 'data:application/json;base64,' + btoa(result);
         chrome.downloads.download({
             url: url,
-            filename: 'data.json'
+            filename: `${key}.json`
         });
     });
 }
@@ -186,7 +186,8 @@ function getOrigin(url) {
 }
 
 document.addEventListener('DOMContentLoaded', async function() {
-    document.getElementById("download").addEventListener("click", download);
+    document.getElementById("download-visited").addEventListener("click", () => download("visited"));
+    document.getElementById("download-filters").addEventListener("click", () => download("filters"));
     document.getElementById('upload').addEventListener("change", upload, false);
     document.getElementById("import").addEventListener('click', openDialog);
     document.getElementById("clear").addEventListener('click', clearData);
