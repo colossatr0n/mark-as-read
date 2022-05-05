@@ -89,50 +89,103 @@ function saveFilters(filters) {
     return chrome.storage.local.set({"filters": filters})
 }
 
+// Duplicate function. Move into util or somthing.
+function saveVisited(visited) {
+    return chrome.storage.local.set({"visited": visited})
+}
+
 function renderFilters(filters) {
     const header = document.getElementById("thead")
     var tbody = document.getElementById('tbody');
+    const addRowHtml = `<tr><td colspan="5" style="text-align: center"><button style="width: 100%" id="add-row">Add Row</button></td></tr>`
     tbody.innerHTML = ""
     Object.keys(filters).forEach(origin => {
         const filtersTextBlock = filters[origin].join("\n")
-        let tr = "<tr>";
-        tr += "<td>" + origin + "</td>" + `<td><textarea rows="4" columns="50">` + filtersTextBlock + "</textarea></td>" 
-              + "<td><input></td>"
-              + "<td></td>"
-              + "<td></td>"
-              + "</tr>";
+        let tr = "";
+        tr += `<tr>` 
+            + `<td><button class="margin-lr remove-filters">Remove</button></td>` 
+            + `<td style="width: 200px; text-align: center">` + origin + "</td>" 
+            + `<td><textarea class="regex-filters" rows="4" columns="50">` + filtersTextBlock + "</textarea></td>" 
+            + `<td><textarea rows="4" columns="100"></textarea></td>`
+            + `<td></td>`
+            + "</tr>";
         tbody.innerHTML += tr
     })
-    if (tbody.innerHTML.length > 0) {
-        header.innerHTML = "<tr> <th>URL Origin</th> <th>Regex Filter</th> <th>Test Example</th> <th>Matches</th> <th>Result</th></tr>"
-    }
+    tbody.innerHTML += addRowHtml 
+    header.innerHTML = "<tr>" 
+                        + `<th>Action</th>`
+                        + "<th>URL Origin</th>"  
+                        + "<th>Regex Filter</th>" 
+                        + "<th>Test Example</th>"
+                        + "<th>Result</th></tr>"
 
-    tbody.querySelectorAll("textarea").forEach(
-        textarea => textarea.addEventListener("focusout", event => {
+    // TODO use this to add any rows, even when generating using filters.
+    tbody.querySelector("#add-row").addEventListener("click", (event) => {
+        const row = event.target.parentElement.parentElement
+        const el = `<tr>` 
+            // + button.outerHTML
+            + `<td><button class="margin-lr remove-filters">Remove</button></td>` 
+            + `<td style="width: 200px; text-align: center"></td>` 
+            + `<td><textarea class="regex-filters" rows="4" columns="50"></textarea></td>` 
+            + `<td><textarea rows="4" columns="100"></textarea></td>`
+            + `<td></td>`
+            + "</tr>";
+        row.insertAdjacentHTML('beforeBegin', el)
+        const newRow = row.previousElementSibling
+        newRow.querySelector(".remove-filters").addEventListener("click", async () => {
+            const rowData = newRow.querySelectorAll("td")
+            const origin = rowData[1].innerText
+            if (origin) {
+                await removeFiltersForUrlOrigin(origin)
+            } else {
+                newRow.remove()
+            }
+        })
+    })
+
+    tbody.querySelectorAll(".regex-filters").forEach(
+        textarea => textarea.addEventListener("focusout", async () => {
             const row = textarea.parentElement.parentElement
             const rowData = row.querySelectorAll("td")
-            const origin = rowData[0].innerText
-            const filters = rowData[1].querySelector("textarea").value.split("\n")
-            clearFilterKey(origin)
+            const origin = rowData[1].innerText
+            const filters = rowData[2].querySelector("textarea").value.split("\n")
+            await clearFilterKey(origin)
             console.log("text area updated")
             filters.forEach(filter => {
                 addFilter(origin, filter)
             })
             
-        }))
+        })
+    )
+
+    tbody.querySelectorAll(".remove-filters").forEach(
+        button => button.addEventListener("click", async () => {
+            const row = button.parentElement.parentElement
+            const rowData = row.querySelectorAll("td")
+            const origin = rowData[1].innerText
+            if (origin) {
+                await removeFiltersForUrlOrigin(origin)
+            } else {
+                row.remove()
+            }
+        })
+    )
+
     tbody.querySelectorAll("tr").forEach(tr => {
         const rowData = tr.querySelectorAll("td")
-            const filters = rowData[1].querySelector("textarea").value.split("\n")
-            rowData[2].addEventListener("change", (event) => {
-                let resultText = event.target.value
-                filters.forEach(filter => {
-                    resultText = resultText.replace(new RegExp(filter), "")
-                })
+            const filters = rowData[2].querySelector("textarea")?.value.split("\n")
+            if (filters) {
+                rowData[3].addEventListener("change", (event) => {
+                    let resultText = event.target.value
+                    filters.forEach(filter => {
+                        resultText = resultText.replace(new RegExp(filter), "")
+                    })
 
-                // rowData[3].innerHTML = findDiff(initialText, resultText)
-                rowData[4].innerHTML = resultText
-                console.log("Calculated example result")
-            })
+                    rowData[4].innerText = resultText 
+                                            ? "Input:\n" + event.target.value + "\n\nOutput:\n" + resultText 
+                                            : ""
+                })
+            }
     })
 }
 
@@ -170,14 +223,31 @@ async function addFilter(url, filter) {
     renderFilters(filtersByOrigin)
 }
 
+async function removeFiltersForUrlOrigin(origin) {
+    const obj = await chrome.storage.local.get("filters")
+    const filtersByOrigin = obj["filters"]
+
+    if (filtersByOrigin[origin]) {
+        delete filtersByOrigin[origin]
+    } 
+    saveFilters(filtersByOrigin)
+    // TODO should rendering be done outside of this function
+    renderFilters(filtersByOrigin)
+}
+
 function clearFilters() {
     return saveFilters({})
+}
+
+function clearVisited() {
+    return saveVisited({})
 }
 
 async function clearFilterKey(originKey) {
     const obj = await chrome.storage.local.get("filters")
     const filtersByOrigin = obj["filters"]
     filtersByOrigin[originKey] = [] 
+    await saveFilters(filtersByOrigin)
 }
 
 // TODO move this into a lib
@@ -193,6 +263,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     document.getElementById("clear").addEventListener('click', clearData);
     document.getElementById("save").addEventListener("click", saveOptions);
 	document.getElementById("restore").addEventListener("click", restoreDefaults);
+    document.getElementById("clear-visited").addEventListener('click', clearVisited);
     document.getElementById("add-filter").addEventListener('click', addFilterFromInput);
     document.getElementById("clear-filters").addEventListener('click', async () => {
         await clearFilters(); 
