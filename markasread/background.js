@@ -223,7 +223,12 @@ async function changeLinkColor(tab) {
                 { action: "get_links" }
             );  
             // Finds visited links
-            const visitedLinks = links.filter(link => isVisited(link, visited))
+            const visitedLinks = []
+            for(const link of links) {
+                if (await isVisited(link, visited)) {
+                    visitedLinks.push(link)
+                }
+            }
             // Sends list of visited links to content script to update the color.
             chrome.tabs.sendMessage(
                 tab.id, 
@@ -237,11 +242,11 @@ async function changeLinkColor(tab) {
     }
 }
 
-function isVisited(url, visited) {
+async function isVisited(url, visited) {
 	if(url) {
 		var key = getOrigin(url);
 		if(visited?.[key]) {
-			var path = url.replace(key, '');
+			var path = await getFilteredPath(url)
 			return visited[key].includes(path);
 		}		
 	}

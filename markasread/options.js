@@ -102,9 +102,9 @@ function renderFilters(filters) {
     Object.keys(filters).forEach(origin => {
         const filtersTextBlock = filters[origin].join("\n")
         let tr = "";
-        tr += `<tr>` 
+        tr += `<tr class="filter-row">` 
             + `<td><button class="margin-lr remove-filters">Remove</button></td>` 
-            + `<td style="width: 200px; text-align: center">` + origin + "</td>" 
+            + `<td><textarea class="regex-filters" rows="4" columns="50">` + origin + "</textarea></td>" 
             + `<td><textarea class="regex-filters" rows="4" columns="50">` + filtersTextBlock + "</textarea></td>" 
             + `<td><textarea rows="4" columns="100"></textarea></td>`
             + `<td></td>`
@@ -122,10 +122,9 @@ function renderFilters(filters) {
     // TODO use this to add any rows, even when generating using filters.
     tbody.querySelector("#add-row").addEventListener("click", (event) => {
         const row = event.target.parentElement.parentElement
-        const el = `<tr>` 
-            // + button.outerHTML
+        const el = `<tr class="filter-row">` 
             + `<td><button class="margin-lr remove-filters">Remove</button></td>` 
-            + `<td style="width: 200px; text-align: center"></td>` 
+            + `<td><textarea class="url-origin" rows="4" columns="50"></textarea></td>` 
             + `<td><textarea class="regex-filters" rows="4" columns="50"></textarea></td>` 
             + `<td><textarea rows="4" columns="100"></textarea></td>`
             + `<td></td>`
@@ -171,7 +170,7 @@ function renderFilters(filters) {
         })
     )
 
-    tbody.querySelectorAll("tr").forEach(tr => {
+    tbody.querySelectorAll(".filter-row").forEach(tr => {
         const rowData = tr.querySelectorAll("td")
             const filters = rowData[2].querySelector("textarea")?.value.split("\n")
             if (filters) {
