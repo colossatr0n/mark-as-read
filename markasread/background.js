@@ -164,7 +164,7 @@ async function removeUrl(url) {
 
 async function markedAsRead(url) {
     if (url) {
-        var key = getKey(url);
+        var key = getOrigin(url);
         const obj = await fetchMarkData()
         const visited = obj["visited"]
         if (visited?.[key]) {
