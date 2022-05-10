@@ -56,25 +56,20 @@
                 <button id="download-filters">Export</button>
             </section>
             <section>
-                <h3>Add New Filter</h3>
-                <div class="margin-tb">
-                    <label>URL </label>
-                </div>
-                <input id="url-origin"> 
-                <div class="margin-tb">
-                    <label>Regex Filter  </label>
-                </div>
-                <input id="filters">
-                <div class="margin-tb">
-                    <button id="add-filter">Add</button>
-                </div>
-            </section>
-            <section>
                 <h3>View & Edit</h3>
                 <div style="max-width: 100%;">
                     <table border="1" style="word-break: break-all;">
-                        <thead id="thead"></thead>
-                        <tbody id="tbody"></tbody>
+                        <thead id="thead">
+                            <tr> 
+                                <th>Action</th>
+                                <th>URL Origin</th>
+                                <th>Regex Filter</th>
+                                <th>Test Example</th>
+                                <th>Result</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody">
+                        </tbody>
                     </table>
                 </div>
            </section>

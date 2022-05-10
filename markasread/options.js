@@ -94,72 +94,74 @@ function saveVisited(visited) {
     return chrome.storage.local.set({"visited": visited})
 }
 
-function renderFilters(filters) {
-    const header = document.getElementById("thead")
+function createRowHtml(origin, filtersTextBlock) {
+    return `<tr class="filter-row">` 
+    + `<td>
+           <div><button class="margin-lr margin-tb remove-filters">Remove</button></div>
+           <div><button class="margin-lr margin-tb save-filters">Save</button></div>
+       </td>` 
+    + `<td><textarea class="url-origin" rows="4" columns="50">${origin}</textarea></td>` 
+    + `<td><textarea class="regex-filters" rows="4" columns="50">${filtersTextBlock}</textarea></td>` 
+    + `<td><textarea rows="4" columns="100"></textarea></td>`
+    + `<td></td>`
+    + "</tr>";
+}
+
+function addRowEventListeners(newRow) {
+    newRow.querySelector(".remove-filters").addEventListener("click", async () => {
+        const rowData = newRow.querySelectorAll("td")
+        const origin = rowData[1].querySelector("textarea").value
+        if (origin) {
+            await removeFiltersForUrlOrigin(origin)
+        } else {
+            newRow.remove()
+        }
+    })
+
+    newRow.querySelector(".save-filters").addEventListener("click", async () => {
+            const rowData = newRow.querySelectorAll("td")
+            const origin = rowData[1].querySelector("textarea").value
+            if (origin) {
+                const filters = rowData[2].querySelector("textarea").value.split("\n")
+                await clearFilterKey(origin)
+                console.log("text area updated")
+                for(const filter of filters) {
+                    await addFilter(origin, filter)
+                }
+            } 
+        })
+}
+
+function addRowsFromFilters(filters) {
     var tbody = document.getElementById('tbody');
-    const addRowHtml = `<tr><td colspan="5" style="text-align: center"><button style="width: 100%" id="add-row">Add Row</button></td></tr>`
-    tbody.innerHTML = ""
+    const lastRow = tbody.querySelector("#add-row")
     Object.keys(filters).forEach(origin => {
         const filtersTextBlock = filters[origin].join("\n")
-        let tr = "";
-        tr += `<tr class="filter-row">` 
-            + `<td><button class="margin-lr remove-filters">Remove</button></td>` 
-            + `<td><textarea class="regex-filters" rows="4" columns="50">` + origin + "</textarea></td>" 
-            + `<td><textarea class="regex-filters" rows="4" columns="50">` + filtersTextBlock + "</textarea></td>" 
-            + `<td><textarea rows="4" columns="100"></textarea></td>`
-            + `<td></td>`
-            + "</tr>";
-        tbody.innerHTML += tr
+        createRowBefore(lastRow, origin, filtersTextBlock)
     })
-    tbody.innerHTML += addRowHtml 
-    header.innerHTML = "<tr>" 
-                        + `<th>Action</th>`
-                        + "<th>URL Origin</th>"  
-                        + "<th>Regex Filter</th>" 
-                        + "<th>Test Example</th>"
-                        + "<th>Result</th></tr>"
+}
 
-    // TODO use this to add any rows, even when generating using filters.
-    tbody.querySelector("#add-row").addEventListener("click", (event) => {
+function createRowBefore(nextSibling, origin, filtersTextBlock) {
+    let tr = createRowHtml(origin, filtersTextBlock)
+    nextSibling.insertAdjacentHTML('beforeBegin', tr)
+    const newRow = nextSibling.previousElementSibling
+    addRowEventListeners(newRow)
+}
+
+function renderFilters(filters) {
+    var tbody = document.getElementById('tbody');
+    tbody.innerHTML = `<tr id="add-row"><td colspan="5" style="text-align: center"><button style="width: 100%" id="add-row-button">Add Row</button></td></tr>`
+
+    addRowsFromFilters(filters)
+
+    tbody.querySelector("#add-row-button").addEventListener("click", (event) => {
         const row = event.target.parentElement.parentElement
-        const el = `<tr class="filter-row">` 
-            + `<td><button class="margin-lr remove-filters">Remove</button></td>` 
-            + `<td><textarea class="url-origin" rows="4" columns="50"></textarea></td>` 
-            + `<td><textarea class="regex-filters" rows="4" columns="50"></textarea></td>` 
-            + `<td><textarea rows="4" columns="100"></textarea></td>`
-            + `<td></td>`
-            + "</tr>";
-        row.insertAdjacentHTML('beforeBegin', el)
-        const newRow = row.previousElementSibling
-        newRow.querySelector(".remove-filters").addEventListener("click", async () => {
-            const rowData = newRow.querySelectorAll("td")
-            const origin = rowData[1].innerText
-            if (origin) {
-                await removeFiltersForUrlOrigin(origin)
-            } else {
-                newRow.remove()
-            }
-        })
+        createRowBefore(row, "", "")
     })
-
-    tbody.querySelectorAll(".regex-filters").forEach(
-        textarea => textarea.addEventListener("focusout", async () => {
-            const row = textarea.parentElement.parentElement
-            const rowData = row.querySelectorAll("td")
-            const origin = rowData[1].innerText
-            const filters = rowData[2].querySelector("textarea").value.split("\n")
-            await clearFilterKey(origin)
-            console.log("text area updated")
-            filters.forEach(filter => {
-                addFilter(origin, filter)
-            })
-            
-        })
-    )
 
     tbody.querySelectorAll(".remove-filters").forEach(
         button => button.addEventListener("click", async () => {
-            const row = button.parentElement.parentElement
+            const row = button.parentElement.parentElement.parentElement
             const rowData = row.querySelectorAll("td")
             const origin = rowData[1].innerText
             if (origin) {
@@ -188,25 +190,10 @@ function renderFilters(filters) {
     })
 }
 
-// function findDiff(str2, str1){ 
-//     let diff= "";
-//     str2.split('').forEach(function(val, i){
-//       if (val != str1.charAt(i)) {
-//         diff += `<b style="color: red">` + val + "</b>";         
-//       } else {
-//           diff += val
-//       }
-//     });
-//     return diff;
-//   }
-
-function addFilterFromInput() {
-    const url = document.getElementById("url-origin").value
-    const filter = document.getElementById("filters").value
-    addFilter(url, filter)
-}
-
 async function addFilter(url, filter) {
+    if (!filter && !url) {
+        return
+    }
     const obj = await chrome.storage.local.get("filters")
     const filtersByOrigin = obj["filters"]
     var origin = getOrigin(url);
@@ -218,7 +205,7 @@ async function addFilter(url, filter) {
     } else {
         filtersByOrigin[origin] = [filter];
     }
-    saveFilters(filtersByOrigin)
+    await saveFilters(filtersByOrigin)
     renderFilters(filtersByOrigin)
 }
 
@@ -263,7 +250,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     document.getElementById("save").addEventListener("click", saveOptions);
 	document.getElementById("restore").addEventListener("click", restoreDefaults);
     document.getElementById("clear-visited").addEventListener('click', clearVisited);
-    document.getElementById("add-filter").addEventListener('click', addFilterFromInput);
     document.getElementById("clear-filters").addEventListener('click', async () => {
         await clearFilters(); 
         initializeFilters()
