@@ -1,13 +1,6 @@
 import { tcDefaults } from "./defaults.js"
 
 chrome.runtime.onInstalled.addListener(async function(details) {
-    if (details.reason == "update") {
-        const result = await chrome.storage.sync.get("visited")
-        if (result["visited"] !== undefined) {
-            const visited = result["visited"];
-            await updateDictionary(visited);
-        }
-    }
     fetchMarkData();
 })
 
@@ -89,7 +82,9 @@ async function fetchMarkData() {
     } else {
         var objVisited = obj["visited"];
         if (objVisited.version != 2) {
-            Object.keys(objVisited).forEach(async url => { await addUrl(url) });
+            for (const url of Object.keys(objVisited)) {
+                await addUrl(url)
+            }
             let obj = await chrome.storage.local.get("visited")
             objVisited = obj["visited"]
             objVisited.version = 2
@@ -112,15 +107,16 @@ function markAsVisited(atabId) {
 chrome.runtime.onMessage.addListener(async function(msg, sender, sendResponse) {
     if (msg.action === 'import') {
         var data = msg.data;
-        Object.keys(data)
-            .filter(key => key != 'version')
-            .forEach(
-                key => {
-                    data[key]
-                        .filter(async value =>  !await markedAsRead(key + value))
-                        .forEach(async value => await addUrl(key + value));
+
+        // filter/map/forEach do not support async/await, hence the usage of "for"
+        const keys = Object.keys(data).filter(key => key != 'version')
+        for (const key of keys) {
+            for (const value of data[key]) {
+                if (!await markedAsRead(key + value)) {
+                    await addUrl(key + value)
                 }
-            )
+            }
+        }
     } else if (msg.action === 'process_post_load_elements') {
         const visited = []
         for(const link of msg.links) {
