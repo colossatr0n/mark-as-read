@@ -119,30 +119,51 @@ function markAsVisited(atabId) {
     return chrome.action.setIcon({ path: "visited.png", tabId: atabId });
 }
 
-chrome.runtime.onMessage.addListener(async function(msg, sender, sendResponse) {
-    if (msg.action === 'import') {
-        var data = msg.data;
-
-        // filter/map/forEach do not support async/await, hence the usage of "for"
-        const keys = Object.keys(data).filter(key => key != 'version')
-        for (const key of keys) {
-            for (const value of data[key]) {
-                if (!await markedAsRead(key + value)) {
-                    await addUrl(key + value)
-                }
-            }
-        }
+// NOTE: Don't use an async callback for an onMessage listener. sendResponse will be invalidated before it can be used.
+chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
+    if (msg.action === 'import-visited') {
+        importVisited(msg.data)
+    } else if (msg.action === 'import-filters') {
+        importFilters(msg.data).then((filtersByOrigin) => sendResponse(filtersByOrigin))
     } else if (msg.action === 'process_post_load_elements') {
-        const visited = []
-        for(const link of msg.links) {
-            if (await markedAsRead(link)) {
-                visited.push(link)
+        processPostLoadElements(sender.tab.id, msg.links).then(sendResponse)
+    }
+    return true
+});
+
+async function processPostLoadElements(senderTabId, links) {
+    const visited = []
+    for(const link of links) {
+        if (await markedAsRead(link)) {
+            visited.push(link)
+        }
+    }
+    chrome.tabs.sendMessage(senderTabId, {action: "change_link_color", links: visited, linkColor: "red"})
+}
+
+async function importVisited(data) {
+    // filter/map/forEach do not support async/await, hence the usage of "for"
+    const keys = Object.keys(data).filter(key => key != 'version')
+    for (const key of keys) {
+        for (const value of data[key]) {
+            if (!await markedAsRead(key + value)) {
+                await addUrl(key + value)
             }
         }
-        chrome.tabs.sendMessage(sender.tab.id, {action: "change_link_color", links: visited, linkColor: "red"})
     }
-    sendResponse()
-});
+}
+
+async function importFilters(filtersByOrigin) {
+    let importedFiltersByOrigin = filtersByOrigin;
+
+    const currentFiltersByOrigin = (await fetchAndNormalizeFilterData())['filters']
+    Object.keys(importedFiltersByOrigin)
+            .forEach(urlOrigin =>  
+                importedFiltersByOrigin[urlOrigin]
+                    .filter(filter => !currentFiltersByOrigin[urlOrigin]?.includes(filter))
+                    .forEach(filter => addFilter(currentFiltersByOrigin, urlOrigin, filter)))
+    await saveFilters(currentFiltersByOrigin)
+}
 
 async function removeUrl(url) {
     // console.log("Remove URL")
@@ -190,6 +211,15 @@ async function addUrl(url) {
         visited[key] = [path];
     }
     await updateDictionary(visited)
+}
+
+function addFilter(filtersByOrigin, url, filter) {
+    const origin = getOrigin(url);
+    if (filtersByOrigin[origin]) {
+        filtersByOrigin[origin].push(filter);
+    } else {
+        filtersByOrigin[origin] = [filter];
+    }
 }
 
 function getOrigin(url) {

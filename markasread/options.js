@@ -11,19 +11,25 @@ function download(key) {
     });
 }
 
-function upload() {
-    var file = this.files[0];
+function upload(key, file) {
     var reader = new FileReader();
+    // TODO find a way to be notified that load finished. Port keeps closing prematurely.
     reader.onload = function(e) {
         var result = JSON.parse(e.target.result);
-        chrome.runtime.sendMessage({ action: 'import', data: result });
+        chrome.runtime.sendMessage({ action: `import-${key}`, data: result }).then(
+            result => renderFilters(result)
+        )
     }
     reader.readAsText(file);
     upload.value = '';
 }
 
-function openDialog() {
-    document.getElementById('upload').click();
+function openVisitedDialog() {
+    document.getElementById('upload-visited').click();
+}
+
+function openFilterDialog() {
+    document.getElementById('upload-filters').click();
 }
 
 function clearData() {
@@ -75,13 +81,13 @@ function restoreOptions() {
 }
 
 async function initializeFilters() {
+    const filters = await fetchFilters() ?? {}
+    renderFilters(filters)
+}
+
+async function fetchFilters() {
     const obj = await chrome.storage.local.get("filters")
-    const filters = obj["filters"]
-    if (filters) {
-        renderFilters(filters)
-    } else {
-        await saveFilters({})
-    }
+    return obj["filters"]
 }
 
 // Duplicate function. Move into util or somthing.
@@ -241,11 +247,17 @@ function getOrigin(url) {
     return new URL(url).origin;
 }
 
+// TODO imported regex aren't escaped correctly. How to fix?
 document.addEventListener('DOMContentLoaded', async function() {
     document.getElementById("download-visited").addEventListener("click", () => download("visited"));
     document.getElementById("download-filters").addEventListener("click", () => download("filters"));
-    document.getElementById('upload').addEventListener("change", upload, false);
-    document.getElementById("import").addEventListener('click', openDialog);
+    document.getElementById('upload-visited').addEventListener("change", (event) => upload("visited", event.target.files[0]), false);
+    document.getElementById('upload-filters').addEventListener(
+        "change", 
+        (event) => upload("filters", event.target.files[0]),
+        false);
+    document.getElementById("import-visited").addEventListener('click', openVisitedDialog);
+    document.getElementById("import-filters").addEventListener('click', openFilterDialog);
     document.getElementById("clear").addEventListener('click', clearData);
     document.getElementById("save").addEventListener("click", saveOptions);
 	document.getElementById("restore").addEventListener("click", restoreDefaults);
