@@ -1,6 +1,6 @@
 import { tcDefaults } from "./defaults.js"
 
-chrome.runtime.onInstalled.addListener(function(details) {
+chrome.runtime.onInstalled.addListener(function() {
     fetchMarkData();
 })
 
