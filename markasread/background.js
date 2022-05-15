@@ -163,6 +163,7 @@ async function importFilters(filtersByOrigin) {
                     .filter(filter => !currentFiltersByOrigin[urlOrigin]?.includes(filter))
                     .forEach(filter => addFilter(currentFiltersByOrigin, urlOrigin, filter)))
     await saveFilters(currentFiltersByOrigin)
+    return currentFiltersByOrigin
 }
 
 async function removeUrl(url) {
