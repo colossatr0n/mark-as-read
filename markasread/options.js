@@ -13,7 +13,6 @@ function download(key) {
 
 function upload(key, file) {
     var reader = new FileReader();
-    // TODO find a way to be notified that load finished. Port keeps closing prematurely.
     reader.onload = function(e) {
         var result = JSON.parse(e.target.result);
         chrome.runtime.sendMessage({ action: `import-${key}`, data: result }).then(
@@ -90,12 +89,12 @@ async function fetchFilters() {
     return obj["filters"]
 }
 
-// Duplicate function. Move into util or somthing.
+// Duplicate function. Move into util or something.
 function saveFilters(filters) {
     return chrome.storage.local.set({"filters": filters})
 }
 
-// Duplicate function. Move into util or somthing.
+// Duplicate function. Move into util or something.
 function saveVisited(visited) {
     return chrome.storage.local.set({"visited": visited})
 }
@@ -103,8 +102,10 @@ function saveVisited(visited) {
 function createRowHtml(origin, filtersTextBlock) {
     return `<tr class="filter-row">` 
     + `<td>
-           <div><button class="margin-lr margin-tb remove-filters">Remove</button></div>
-           <div><button class="margin-lr margin-tb save-filters">Save</button></div>
+           <div class="margin-lr">
+                <div><button style="width: 100%" class="remove-filters">Remove</button></div>
+                <div><button style="width: 100%; margin-top: 5px" class="save-filters">Save</button></div>
+           </div>
        </td>` 
     + `<td><textarea class="url-origin" rows="4" columns="50">${origin}</textarea></td>` 
     + `<td><textarea class="regex-filters" rows="4" columns="50">${filtersTextBlock}</textarea></td>` 
