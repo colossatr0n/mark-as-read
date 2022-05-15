@@ -2,7 +2,7 @@ import { tcDefaults } from "./defaults.js"
 
 function download() {
     chrome.storage.local.get("visited", function(obj) {
-        var result = JSON.stringify(obj["visited"]);
+        var result = JSON.stringify(obj["visited"], null, 4); 
         var url = 'data:application/json;base64,' + btoa(result);
         chrome.downloads.download({
             url: url,
